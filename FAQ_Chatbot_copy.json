@@ -1,0 +1,708 @@
+{
+  "workflowDescription": "This n8n workflow defines an FAQ Chatbot. It uses a webhook to receive user messages, retrieves past conversation memories from Airtable, scrapes specified URLs for context using a local script, uses OpenAI for language understanding and generating responses (including managing conversation memory and using scraped data), and saves new memories back to Airtable. \n\nSETUP INSTRUCTIONS:\n1. Replace placeholder values like `<YOUR_WEBHOOK_PATH>`, `<YOUR_AIRTABLE_BASE_ID>`, `<YOUR_AIRTABLE_TABLE_ID>`, `<YOUR_AIRTABLE_CREDENTIALS_ID>`, `<YOUR_OPENAI_CREDENTIALS_ID>`, and `<PATH_TO_YOUR_SCRAPE_SCRIPT>.js` with your actual values.\n2. Ensure the Airtable base and table have the required columns ('Memory', 'User', 'Created').\n3. Make sure the scrape script specified in the 'Execute Command' node exists and is executable.\n4. Configure your n8n credentials for Airtable ('Airtable Personal Access Token account') and OpenAI ('OpenAi account').\n5. Activate the workflow.",
+  "name": "FAQ Chatbot copy",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1840,
+        285
+      ],
+      "id": "3f04b433-45cf-4c7f-ada5-6da89da7202d",
+      "name": "When clicking ‘Test workflow’",
+      "description": "Manual trigger for testing the workflow, typically used during development to initiate the data scraping part."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1180,
+        485
+      ],
+      "id": "6284319f-975f-4835-8e45-da56e715b094",
+      "name": "Loop Over Items",
+      "description": "Loops over the items provided (e.g., URLs to scrape), processing each one individually."
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        560
+      ],
+      "id": "389e7c40-2da3-4cf1-8e4a-ab3ee967a9e4",
+      "description": "Placeholder node, likely intended to be replaced with actual logic or removed. Currently acts as a no-operation step in the loop."
+    },
+    {
+      "parameters": {
+        "command": "=node <PATH_TO_YOUR_SCRAPE_SCRIPT>.js {{ $json.urls[0] }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        360
+      ],
+      "id": "c7b3a9b9-6327-4865-bdc3-bd82f543c9a1",
+      "name": "Execute Command",
+      "description": "Executes a local command-line script (e.g., a Node.js scraper) passing the URL from the current loop item as an argument. Replace `<PATH_TO_YOUR_SCRAPE_SCRIPT>.js` with the actual path to your script."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<YOUR_WEBHOOK_PATH>",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1840,
+        -160
+      ],
+      "id": "5aa3d262-7b83-4247-91fb-6f571b1a5b44",
+      "name": "Webhook",
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "description": "Entry point for the chatbot. Receives incoming user messages via HTTP POST requests. Replace `<YOUR_WEBHOOK_PATH>` and `<YOUR_WEBHOOK_ID>` with your specific webhook configuration."
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "<YOUR_AIRTABLE_BASE_ID>",
+          "mode": "list",
+          "cachedResultName": "Chatbot Memories",
+          "cachedResultUrl": "https://airtable.com/<YOUR_AIRTABLE_BASE_ID>"
+        },
+        "table": {
+          "__rl": true,
+          "value": "<YOUR_AIRTABLE_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "Memory",
+          "cachedResultUrl": "https://airtable.com/<YOUR_AIRTABLE_BASE_ID>/<YOUR_AIRTABLE_TABLE_ID>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Memory": "={{ $fromAI('Memory', `Summary of memory`, 'string') }}",
+            "User": "={{ $('Webhook').item.json.body.userId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Memory",
+              "displayName": "Memory",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User",
+              "displayName": "User",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created",
+              "displayName": "Created",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtableTool",
+      "typeVersion": 2.1,
+      "position": [
+        -4,
+        230
+      ],
+      "id": "e1ddb5ed-f361-4db4-91ed-de1cc4ec1f30",
+      "name": "Save Memory",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "<YOUR_AIRTABLE_CREDENTIALS_ID>",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "description": "Saves a summary of the conversation memory to an Airtable base. Used as a tool by the Langchain Agent. Replace `<YOUR_AIRTABLE_BASE_ID>`, `<YOUR_AIRTABLE_TABLE_ID>`, and `<YOUR_AIRTABLE_CREDENTIALS_ID>`."
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "<YOUR_AIRTABLE_BASE_ID>",
+          "mode": "list",
+          "cachedResultName": "Chatbot Memories",
+          "cachedResultUrl": "https://airtable.com/<YOUR_AIRTABLE_BASE_ID>"
+        },
+        "table": {
+          "__rl": true,
+          "value": "<YOUR_AIRTABLE_TABLE_ID>",
+          "mode": "list",
+          "cachedResultName": "Memory",
+          "cachedResultUrl": "https://airtable.com/<YOUR_AIRTABLE_BASE_ID>/<YOUR_AIRTABLE_TABLE_ID>"
+        },
+        "filterByFormula": "=({user}='{{ $json.body.userId }}')",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -1620,
+        -165
+      ],
+      "id": "449016ec-7762-421d-89a2-1804b1ec844b",
+      "name": "Get Memories",
+      "alwaysOutputData": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "<YOUR_AIRTABLE_CREDENTIALS_ID>",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "description": "Retrieves past conversation memories for the specific user from Airtable. Replace `<YOUR_AIRTABLE_BASE_ID>`, `<YOUR_AIRTABLE_TABLE_ID>`, and `<YOUR_AIRTABLE_CREDENTIALS_ID>`. The filter formula uses the userId from the webhook."
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "memories",
+        "include": "specifiedFields",
+        "fieldsToInclude": "Memory, Created",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -165
+      ],
+      "id": "6c61be38-a10d-4969-84be-1cc997872043",
+      "name": "Aggregate",
+      "description": "Aggregates the retrieved memories into a single item under the 'memories' field, including only the 'Memory' and 'Created' fields."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1180,
+        -240
+      ],
+      "id": "4988b865-d751-4fb5-a336-1eafed84e163",
+      "name": "Merge",
+      "description": "Merges data streams. In this case, it combines the incoming webhook data with the aggregated memories before passing them to the agent."
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={\n  \"userId\": \"{{ $('Webhook').first().json.body.userId }}\",\n  \"message\": \"{{ $('Webhook').first().json.body.message }}\"\n}",
+        "contextWindowLength": 50
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -120,
+        220
+      ],
+      "id": "55214f67-057d-4195-9a72-ab42d04175c6",
+      "name": "Window Buffer Memory",
+      "description": "Provides short-term conversation memory (buffer window) for the Langchain Agent, keyed by userId and message."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        20
+      ],
+      "id": "defd1b2e-5b1d-4644-acb2-8373bf9cdcf4",
+      "name": "Respond to Webhook1",
+      "description": "Sends the final response generated by the agent back to the user who initiated the webhook request."
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "gpt-3.5-turbo"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -244,
+        230
+      ],
+      "id": "0021e447-06e4-4a83-b5bc-b3c28e383cf1",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "<YOUR_OPENAI_CREDENTIALS_ID>",
+          "name": "OpenAi account"
+        }
+      },
+      "description": "Specifies the OpenAI chat model (e.g., gpt-3.5-turbo) to be used by the Langchain Agent. Replace `<YOUR_OPENAI_CREDENTIALS_ID>`."
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"urls\": [\n    \"https://www.sirencraftbrew.com/faqs\"\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1620,
+        235
+      ],
+      "id": "ddc88b37-99b3-403f-ab0f-97eaaacd6e59",
+      "name": "URLs To Scrape",
+      "description": "Defines the list of URLs that the workflow should scrape for information. Modify the 'urls' array to include the desired target URLs."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').first().json.body.message }}",
+        "options": {
+          "systemMessage": "=# ROLE\nYou are a friendly AI assistant.\nYou are currently talking to user {{ $('Webhook').first().json.body.userId }}.\n\n# RULES\nWhen a user sends a new message, decide if the user provided any noteworthy information that should be stored in memory. If so, call the Save Memory tool to store this information in memory. DO NOT inform the user that this information was stored in memory.  Simply continue to answer the question or execute the next tasks.\n\n# Tools\n## Save Memory\nUse this tool to store information about the user. Extract and summarize interesting information from the user message and pass it to this tool.\n## Scraped Memory\nUse this tool to correctly retrieve the embedded This will help you answer questions about the websites with more accuracy. Use the initial question from the message \"{{ $('Webhook').first().json.body.message }}\" to search scrapedMemory for the embedded information.\n\n# Memories\nHere are the last noteworthy memories that you've collected from the user, including the date and time this information was collected.\n!! IMPORTANT!\nThink carefully about your responses and take the user's preferences into account!\nAlso consider the date and time that a memory was shared in order to respond with the most up to date information.\n\n{{$json.memories?.toJsonString() }} \nconsole.log($json.memories)"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -140,
+        20
+      ],
+      "id": "4593c260-b3b3-4af9-8f69-6919d1d605f1",
+      "name": "Q&Abot",
+      "description": "The core Langchain Agent that processes the user's message, utilizes the provided tools (Save Memory, Scraped Memory), considers past memories, and generates a response using the configured language model and short-term memory."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "429d3d61-44f6-4b8a-a767-662daa543e78",
+              "leftValue": "={{ $json.urls[0] }}",
+              "rightValue": "={{ $('Webhook').item.json.webhookUrl }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1400,
+        485
+      ],
+      "id": "455f6601-d98f-4010-bdb1-f56ee297350a",
+      "name": "If",
+      "description": "Conditional logic node. The specific condition here seems to compare a URL from the 'URLs To Scrape' node with the webhook URL, potentially to control the scraping flow based on how the workflow was triggered. The 'true' path is empty, the 'false' path leads to the scraping loop."
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "clearStore": "={{ false }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        360
+      ],
+      "id": "177d545d-789a-4575-9b27-306d6278b462",
+      "name": "Simple Vector Store",
+      "description": "An in-memory vector store used to hold the embeddings of the scraped website content. This allows for semantic searching of the scraped data."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -740,
+        580
+      ],
+      "id": "33519f67-e8d1-4c8d-b16a-218077e5a975",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "<YOUR_OPENAI_CREDENTIALS_ID>",
+          "name": "OpenAi account"
+        }
+      },
+      "description": "Generates embeddings for the scraped text content using OpenAI, preparing it for storage in the vector store. Replace `<YOUR_OPENAI_CREDENTIALS_ID>`."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        204,
+        430
+      ],
+      "id": "d4f482ee-2c97-4f84-a959-61450cdbeafe",
+      "name": "Embeddings OpenAI2",
+      "credentials": {
+        "openAiApi": {
+          "id": "<YOUR_OPENAI_CREDENTIALS_ID>",
+          "name": "OpenAi account"
+        }
+      },
+      "description": "Generates embeddings using OpenAI, likely for the user's query, to enable semantic search against the vector store. Replace `<YOUR_OPENAI_CREDENTIALS_ID>`."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        582.5
+      ],
+      "id": "fa00c003-947a-4dfc-bf8b-a664eac85614",
+      "name": "Default Data Loader",
+      "description": "Loads the scraped data (likely text content) into a format suitable for Langchain document processing."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -532,
+        780
+      ],
+      "id": "d98e90b7-eacc-4b35-a8d1-4e4d2ddf714b",
+      "name": "Recursive Character Text Splitter",
+      "description": "Splits the loaded document text into smaller chunks, which is necessary for effective embedding and vector store retrieval."
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "scrapedMemory",
+        "toolDescription": "=\n[\n{\n\"query\": \n\"{{ $('Webhook').first().json.body.message }}\"\n}\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.1,
+      "position": [
+        120,
+        240
+      ],
+      "id": "f927afc6-8a47-4f98-9542-52ab0ec3a996",
+      "name": "Scraped Memory",
+      "description": "Exposes the in-memory vector store (containing scraped website data) as a tool named 'scrapedMemory' for the Langchain Agent. The agent can query this tool using the user's message to find relevant information from the scraped content."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "URLs To Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Memories",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "URLs To Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Memories": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URLs To Scrape": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Q&Abot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q&Abot": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Scraped Memory",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scraped Memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "Q&Abot",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "48f949f8-dbcf-4eae-8985-d3e93fd79e1d",
+  "tags": []
+}
